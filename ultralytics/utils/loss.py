@@ -12,6 +12,8 @@ from ultralytics.utils.torch_utils import autocast
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
 
+import copy
+import random
 
 class VarifocalLoss(nn.Module):
     """
@@ -259,6 +261,90 @@ class v8DetectionLoss:
 
         return loss.sum() * batch_size, loss.detach()  # loss(box, cls, dfl)
 
+class v8DetectionLossEWC(v8DetectionLoss):
+    """
+    v8DetectionLoss에 Elastic Weight Consolidation(EWC) 기능을 추가한 클래스.
+    
+    - model: 학습할 모델 (PyTorch nn.Module)
+    - dataset: EWC용 데이터셋. 리스트 형태로 각 샘플이 (input, target) 튜플로 구성되어야 함.
+    - ewc_lambda: EWC 정규화 항의 가중치
+    - ewc_samples: Fisher 행렬 근사를 위해 사용할 샘플 수
+    - tal_topk: 기존 v8DetectionLoss의 tal_topk 인자
+    """
+    def __init__(self, model, dataset, ewc_lambda=1.0, ewc_samples=100, tal_topk=10):
+        # 부모 클래스 초기화 (모델 관련 속성 및 기존 손실 함수 정의)
+        super().__init__(model, tal_topk)
+        self.model = model  # 모델 참조 (EWC 계산에 사용)
+        self.ewc_lambda = ewc_lambda
+        self.ewc_samples = ewc_samples
+        self.dataset = dataset  # EWC에 사용할 데이터셋
+        
+        # 현재 모델의 가중치를 '최적 가중치'로 저장 (deep copy)
+        self.optimal_weights = {name: param.clone().detach() for name, param in model.named_parameters()}
+        # Fisher 정보 행렬 대각 성분을 계산
+        self.fisher = self.compute_fisher_matrix()
+
+    def compute_fisher_matrix(self):
+        """
+        주어진 dataset의 일부 샘플을 사용해 Fisher 정보 행렬의 대각 성분을 근사한다.
+        각 파라미터에 대해 gradient 제곱의 평균을 계산한다.
+        """
+        # 모델 파라미터별로 Fisher 값을 저장할 dict 생성
+        fisher = {name: torch.zeros_like(param) for name, param in self.model.named_parameters()}
+        self.model.eval()  # 평가 모드
+        
+        dataset_size = len(self.dataset)
+        for _ in range(self.ewc_samples):
+            # 데이터셋에서 무작위로 한 샘플 선택 (입력, 타깃 튜플)
+            idx = random.randint(0, dataset_size - 1)
+            input_sample, target_sample = self.dataset[idx]
+            # 입력 데이터에 배치 차원 추가 후 device로 이동
+            input_sample = input_sample.unsqueeze(0).to(self.device)
+            
+            # 기존 v8DetectionLoss가 요구하는 배치 형식에 맞게 target도 구성
+            # 예시로, target_sample은 딕셔너리 형태로 {'cls': tensor, 'bboxes': tensor}라고 가정
+            batch = {
+                "batch_idx": torch.tensor([0], device=self.device),
+                "cls": target_sample['cls'].unsqueeze(0).to(self.device),
+                "bboxes": target_sample['bboxes'].unsqueeze(0).to(self.device)
+            }
+            
+            # 모델의 gradient 초기화
+            self.model.zero_grad()
+            # 순전파: 검출 결과 예측
+            preds = self.model(input_sample)
+            # v8DetectionLoss의 __call__을 사용해 손실 계산 (검출 손실)
+            loss, _ = self.__call__(preds, batch)
+            # 스칼라 손실에 대해 역전파 수행
+            loss.backward()
+            
+            # 각 파라미터에 대해 gradient 제곱을 누적
+            for name, param in self.model.named_parameters():
+                if param.grad is not None:
+                    fisher[name] += param.grad.detach() ** 2
+                    
+        # 샘플 수로 나누어 평균값을 취함
+        for name in fisher:
+            fisher[name] /= self.ewc_samples
+        return fisher
+
+    def __call__(self, preds, batch):
+        """
+        기존 검출 손실 계산 후, EWC 정규화 항을 추가한다.
+        """
+        # 기존 v8DetectionLoss의 검출 손실과 개별 손실 항목(loss[0]: bbox, loss[1]: cls, loss[2]: dfl)
+        detection_loss, losses = super().__call__(preds, batch)
+        
+        # EWC 정규화 항 계산: 각 파라미터에 대해 F*(current - optimal)^2의 합
+        ewc_penalty = 0.0
+        for name, param in self.model.named_parameters():
+            ewc_penalty += torch.sum(self.fisher[name] * (param - self.optimal_weights[name]) ** 2)
+        
+        # 전체 손실에 EWC 페널티 추가 (가중치는 ewc_lambda/2)
+        total_loss = detection_loss + (self.ewc_lambda / 2.0) * ewc_penalty
+        return total_loss, losses
+
+v8DetectionLoss = v8DetectionLossEWC 
 
 class v8SegmentationLoss(v8DetectionLoss):
     """Criterion class for computing training losses."""
