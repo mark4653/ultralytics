@@ -15,7 +15,15 @@ OKS_SIGMA = (
     / 10.0
 )
 
-
+plt.rcParams.update({
+    'font.size': 20,           # 전체 기본 폰트 크기
+    'axes.titlesize': 20,      # 축 제목 타이틀 크기
+    'axes.labelsize': 20,      # x, y축 레이블 크기
+    'xtick.labelsize': 20,     # x축 눈금 라벨 크기
+    'ytick.labelsize': 20,     # y축 눈금 라벨 크기
+    'legend.fontsize': 20,     # 범례 폰트 크기
+    'figure.titlesize': 20     # Figure 전체 제목 크기
+})
 def bbox_ioa(box1, box2, iou=False, eps=1e-7):
     """
     Calculate the intersection over box2 area given box1 and box2. Boxes are in x1y1x2y2 format.
@@ -420,6 +428,15 @@ class ConfusionMatrix:
         import matplotlib.pyplot as plt  # scope for faster 'import ultralytics'
         import seaborn
 
+        plt.rcParams.update({
+    'font.size': 20,           # 전체 기본 폰트 크기
+    'axes.titlesize': 20,      # 축 제목 타이틀 크기
+    'axes.labelsize': 20,      # x, y축 레이블 크기
+    'xtick.labelsize': 20,     # x축 눈금 라벨 크기
+    'ytick.labelsize': 20,     # y축 눈금 라벨 크기
+    'legend.fontsize': 20,     # 범례 폰트 크기
+    'figure.titlesize': 20     # Figure 전체 제목 크기
+})
         array = self.matrix / ((self.matrix.sum(0).reshape(1, -1) + 1e-9) if normalize else 1)  # normalize columns
         array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
 
@@ -446,6 +463,7 @@ class ConfusionMatrix:
         ax.set_xlabel("True")
         ax.set_ylabel("Predicted")
         ax.set_title(title)
+        ax.set_fontsize(14)
         plot_fname = Path(save_dir) / f"{title.lower().replace(' ', '_')}.png"
         fig.savefig(plot_fname, dpi=250)
         plt.close(fig)
@@ -481,6 +499,15 @@ def plot_pr_curve(px, py, ap, save_dir=Path("pr_curve.png"), names={}, on_plot=N
     """
     import matplotlib.pyplot as plt  # scope for faster 'import ultralytics'
 
+    plt.rcParams.update({
+    'font.size': 20,           # 전체 기본 폰트 크기
+    'axes.titlesize': 20,      # 축 제목 타이틀 크기
+    'axes.labelsize': 20,      # x, y축 레이블 크기
+    'xtick.labelsize': 20,     # x축 눈금 라벨 크기
+    'ytick.labelsize': 20,     # y축 눈금 라벨 크기
+    'legend.fontsize': 20,     # 범례 폰트 크기
+    'figure.titlesize': 20     # Figure 전체 제목 크기
+})
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), tight_layout=True)
     py = np.stack(py, axis=1)
 
