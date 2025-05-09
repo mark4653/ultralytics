@@ -15,15 +15,7 @@ OKS_SIGMA = (
     / 10.0
 )
 
-plt.rcParams.update({
-    'font.size': 20,           # 전체 기본 폰트 크기
-    'axes.titlesize': 20,      # 축 제목 타이틀 크기
-    'axes.labelsize': 20,      # x, y축 레이블 크기
-    'xtick.labelsize': 20,     # x축 눈금 라벨 크기
-    'ytick.labelsize': 20,     # y축 눈금 라벨 크기
-    'legend.fontsize': 20,     # 범례 폰트 크기
-    'figure.titlesize': 20     # Figure 전체 제목 크기
-})
+
 def bbox_ioa(box1, box2, iou=False, eps=1e-7):
     """
     Calculate the intersection over box2 area given box1 and box2. Boxes are in x1y1x2y2 format.
@@ -545,7 +537,15 @@ def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names={}, xlabel="Confi
         on_plot (callable, optional): Function to call after plot is saved.
     """
     import matplotlib.pyplot as plt  # scope for faster 'import ultralytics'
-
+    plt.rcParams.update({
+    'font.size': 20,           # 전체 기본 폰트 크기
+    'axes.titlesize': 20,      # 축 제목 타이틀 크기
+    'axes.labelsize': 20,      # x, y축 레이블 크기
+    'xtick.labelsize': 20,     # x축 눈금 라벨 크기
+    'ytick.labelsize': 20,     # y축 눈금 라벨 크기
+    'legend.fontsize': 20,     # 범례 폰트 크기
+    'figure.titlesize': 20     # Figure 전체 제목 크기
+})
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), tight_layout=True)
 
     if 0 < len(names) < 21:  # display per-class legend if < 21 classes
